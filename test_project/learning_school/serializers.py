@@ -1,6 +1,6 @@
 from .models import UserGroup, Product, Access, Lesson
 from django.contrib.auth.models import User
-from django.db.models import Count
+from django.db.models import Count, Q
 from rest_framework import serializers
 
 
@@ -32,9 +32,9 @@ class AccessSerializer(serializers.Serializer):
                     'data': UserGroupSerializer(low_group).data,
                     'detail': f"User added in the group {low_group.name}"}
         else:
-            raise {'status': "error",
-                   'data': None,
-                   'detail': "There are no places"}
+            return {'status': "error",
+                    'data': None,
+                    'detail': "There are no places"}
 
 
 class ProductSerializer(serializers.ModelSerializer):
@@ -52,3 +52,22 @@ class LessonSerializer(serializers.ModelSerializer):
     class Meta:
         model = Lesson
         fields = '__all__'
+
+
+class LessonAccessSerializer(serializers.Serializer):
+    product = serializers.CharField()
+    user = serializers.CharField()
+
+    def validate(self, data):
+        product_name = data.get('product')
+        user = data.get('user')
+
+        try:
+            Access.objects.get(Q(product__name=product_name) & Q(user__username=user))
+        except:
+            raise serializers.ValidationError("User has no access or user does not exist.")
+
+        lessons = Lesson.objects.filter(product__name=product_name)
+        return {'status': 'success',
+                'data': LessonSerializer(lessons, many=True).data,
+                'detail': None}
